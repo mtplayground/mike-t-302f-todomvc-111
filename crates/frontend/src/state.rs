@@ -12,6 +12,30 @@ pub enum TodoFilter {
 }
 
 impl TodoFilter {
+    pub fn from_hash(hash: &str) -> Self {
+        match hash.trim_start_matches('#') {
+            "/active" | "active" => Self::Active,
+            "/completed" | "completed" => Self::Completed,
+            _ => Self::All,
+        }
+    }
+
+    pub fn hash(self) -> &'static str {
+        match self {
+            Self::All => "#/",
+            Self::Active => "#/active",
+            Self::Completed => "#/completed",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::Active => "Active",
+            Self::Completed => "Completed",
+        }
+    }
+
     pub fn matches(self, todo: &Todo) -> bool {
         match self {
             Self::All => true,
