@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "crates/backend",
+    "crates/frontend",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/mtplayground/mike-t-302f-todomvc-111"
+
