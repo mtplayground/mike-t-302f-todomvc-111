@@ -1,6 +1,7 @@
 use crate::todos::TodoRepositoryError;
 use axum::{
     Json,
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -114,6 +115,12 @@ impl From<TodoRepositoryError> for AppError {
             }
             TodoRepositoryError::Database(source) => Self::Database(source),
         }
+    }
+}
+
+impl From<JsonRejection> for AppError {
+    fn from(error: JsonRejection) -> Self {
+        Self::BadRequest(error.body_text())
     }
 }
 
