@@ -93,7 +93,18 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
     let id = todo.id;
     let title = todo.title;
     let completed = todo.completed;
-    let item_class = move || if completed { "completed" } else { "" };
+    let editing = RwSignal::new(false);
+    let draft = RwSignal::new(title.clone());
+    let title_for_start = title.clone();
+    let title_for_cancel = title.clone();
+    let title_for_save = title.clone();
+    let label_title = title;
+    let item_class = move || match (completed, editing.get()) {
+        (true, true) => "completed editing",
+        (true, false) => "completed",
+        (false, true) => "editing",
+        (false, false) => "",
+    };
     let toggle = move || {
         spawn_local(async move {
             let _result = state
@@ -112,6 +123,41 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
             let _result = state.delete_todo(id).await;
         });
     };
+    let start_editing = move || {
+        draft.set(title_for_start.clone());
+        editing.set(true);
+    };
+    let cancel_editing = move || {
+        draft.set(title_for_cancel.clone());
+        editing.set(false);
+    };
+    let save_editing = move || {
+        let trimmed = draft.get().trim().to_owned();
+        editing.set(false);
+
+        if trimmed.is_empty() {
+            spawn_local(async move {
+                let _result = state.delete_todo(id).await;
+            });
+            return;
+        }
+
+        if trimmed == title_for_save {
+            return;
+        }
+
+        spawn_local(async move {
+            let _result = state
+                .update_todo(
+                    id,
+                    UpdateTodoRequest {
+                        title: Some(trimmed),
+                        completed: None,
+                    },
+                )
+                .await;
+        });
+    };
 
     view! {
         <li class=item_class>
@@ -122,7 +168,7 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
                     prop:checked=completed
                     on:change=move |_event| toggle()
                 />
-                <label>{title}</label>
+                <label on:dblclick=move |_event| start_editing()>{label_title}</label>
                 <button
                     class="destroy"
                     type="button"
@@ -130,6 +176,18 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
                     on:click=move |_event| destroy()
                 ></button>
             </div>
+            <input
+                class="edit"
+                prop:value=move || draft.get()
+                on:input=move |event| draft.set(event_target_value(&event))
+                on:keydown=move |event| {
+                    match event.key().as_str() {
+                        "Enter" => save_editing(),
+                        "Escape" => cancel_editing(),
+                        _ => {}
+                    }
+                }
+            />
         </li>
     }
 }
