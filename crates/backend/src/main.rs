@@ -1,6 +1,8 @@
 mod config;
 mod db;
+mod models;
 mod state;
+mod todos;
 
 use axum::{Router, extract::State, routing::get};
 use config::Config;
