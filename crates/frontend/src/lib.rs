@@ -4,8 +4,11 @@ pub mod types;
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
-use state::TodoState;
+use state::{TodoFilter, TodoState};
 use types::{Todo, UpdateTodoRequest};
+
+#[cfg(target_arch = "wasm32")]
+use leptos::{ev, leptos_dom::helpers::window_event_listener};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -15,6 +18,16 @@ pub fn App() -> impl IntoView {
 #[component]
 pub fn TodoApp() -> impl IntoView {
     let state = TodoState::new();
+    state.filter.set(filter_from_hash());
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let filter_state = state;
+        let handle = window_event_listener(ev::hashchange, move |_event| {
+            filter_state.filter.set(filter_from_hash());
+        });
+        on_cleanup(move || handle.remove());
+    }
 
     Effect::new(move |_| {
         spawn_local(async move {
@@ -27,9 +40,22 @@ pub fn TodoApp() -> impl IntoView {
             <TodoHeader state=state/>
             <Show when=move || !state.todos.get().is_empty()>
                 <section class="main">
+                    <input
+                        id="toggle-all"
+                        class="toggle-all"
+                        type="checkbox"
+                        prop:checked=move || state.active_count() == 0
+                        on:change=move |_event| {
+                            let completed = state.active_count() > 0;
+                            spawn_local(async move {
+                                let _result = state.toggle_all(completed).await;
+                            });
+                        }
+                    />
+                    <label for="toggle-all"></label>
                     <TodoList state=state/>
                 </section>
-                <footer class="footer"></footer>
+                <TodoFooter state=state/>
             </Show>
         </section>
     }
@@ -70,6 +96,57 @@ fn TodoHeader(state: TodoState) -> impl IntoView {
                 }
             />
         </header>
+    }
+}
+
+#[component]
+fn TodoFooter(state: TodoState) -> impl IntoView {
+    let item_word = move || {
+        if state.active_count() == 1 {
+            " item left"
+        } else {
+            " items left"
+        }
+    };
+
+    view! {
+        <footer class="footer">
+            <span class="todo-count">
+                <strong>{move || state.active_count()}</strong>
+                {item_word}
+            </span>
+            <ul class="filters">
+                <li><TodoFilterLink state=state filter=TodoFilter::All/></li>
+                <li><TodoFilterLink state=state filter=TodoFilter::Active/></li>
+                <li><TodoFilterLink state=state filter=TodoFilter::Completed/></li>
+            </ul>
+            <Show when=move || state.completed_count() > 0>
+                <button
+                    class="clear-completed"
+                    type="button"
+                    on:click=move |_event| {
+                        spawn_local(async move {
+                            let _result = state.clear_completed().await;
+                        });
+                    }
+                >
+                    "Clear completed"
+                </button>
+            </Show>
+        </footer>
+    }
+}
+
+#[component]
+fn TodoFilterLink(state: TodoState, filter: TodoFilter) -> impl IntoView {
+    view! {
+        <a
+            href=filter.hash()
+            class=move || if state.filter.get() == filter { "selected" } else { "" }
+            on:click=move |_event| state.filter.set(filter)
+        >
+            {filter.label()}
+        </a>
     }
 }
 
@@ -189,6 +266,19 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
                 }
             />
         </li>
+    }
+}
+
+fn filter_from_hash() -> TodoFilter {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let hash = leptos::window().location().hash().unwrap_or_default();
+        return TodoFilter::from_hash(&hash);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        TodoFilter::All
     }
 }
 
