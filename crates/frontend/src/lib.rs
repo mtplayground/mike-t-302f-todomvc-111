@@ -5,6 +5,7 @@ pub mod types;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use state::TodoState;
+use types::{Todo, UpdateTodoRequest};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -25,7 +26,9 @@ pub fn TodoApp() -> impl IntoView {
         <section class="todoapp">
             <TodoHeader state=state/>
             <Show when=move || !state.todos.get().is_empty()>
-                <section class="main"></section>
+                <section class="main">
+                    <TodoList state=state/>
+                </section>
                 <footer class="footer"></footer>
             </Show>
         </section>
@@ -67,6 +70,67 @@ fn TodoHeader(state: TodoState) -> impl IntoView {
                 }
             />
         </header>
+    }
+}
+
+#[component]
+fn TodoList(state: TodoState) -> impl IntoView {
+    view! {
+        <ul class="todo-list">
+            <For
+                each=move || state.visible_todos()
+                key=|todo| todo.id
+                let:todo
+            >
+                <TodoItem state=state todo=todo/>
+            </For>
+        </ul>
+    }
+}
+
+#[component]
+fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
+    let id = todo.id;
+    let title = todo.title;
+    let completed = todo.completed;
+    let item_class = move || if completed { "completed" } else { "" };
+    let toggle = move || {
+        spawn_local(async move {
+            let _result = state
+                .update_todo(
+                    id,
+                    UpdateTodoRequest {
+                        title: None,
+                        completed: Some(!completed),
+                    },
+                )
+                .await;
+        });
+    };
+    let destroy = move || {
+        spawn_local(async move {
+            let _result = state.delete_todo(id).await;
+        });
+    };
+
+    view! {
+        <li class=item_class>
+            <div class="view">
+                <input
+                    class="toggle"
+                    type="checkbox"
+                    prop:checked=completed
+                    on:change=move |_event| toggle()
+                />
+                <label>{title}</label>
+                <button
+                    class="destroy"
+                    type="button"
+                    aria-label="Delete todo"
+                    on:click=move |_event| destroy()
+                ></button>
+            </div>
+        </li>
     }
 }
 
