@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod error;
 mod models;
+mod routes;
 mod state;
 mod todos;
 
@@ -22,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .merge(routes::todo_routes())
         .fallback_service(static_files)
         .with_state(state);
     let listener = TcpListener::bind(config.bind_address).await?;
