@@ -1,11 +1,13 @@
 mod config;
 mod db;
+mod error;
 mod models;
 mod state;
 mod todos;
 
-use axum::{Router, extract::State, routing::get};
+use axum::{Json, Router, extract::State, routing::get};
 use config::Config;
+use error::DataResponse;
 use state::AppState;
 use std::path::{Path, PathBuf};
 use tokio::net::TcpListener;
@@ -29,10 +31,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn health(State(state): State<AppState>) -> &'static str {
+async fn health(State(state): State<AppState>) -> Json<DataResponse<&'static str>> {
     let _db = state.db.clone();
 
-    "ok"
+    Json(DataResponse::new("ok"))
 }
 
 fn static_files(root: PathBuf) -> ServeDir<ServeFile> {
