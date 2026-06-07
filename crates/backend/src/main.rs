@@ -1,5 +1,11 @@
 use axum::{Json, Router, extract::State, routing::get};
-use backend::{config::Config, db, error::DataResponse, routes, state::AppState};
+use backend::{
+    config::Config,
+    db,
+    error::{ApiResult, DataResponse},
+    routes,
+    state::AppState,
+};
 use std::path::{Path, PathBuf};
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
@@ -18,15 +24,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .with_state(state);
     let listener = TcpListener::bind(config.bind_address).await?;
 
+    eprintln!("listening on {}", config.bind_address);
+    eprintln!(
+        "serving frontend assets from {}",
+        config.frontend_dist_dir.display()
+    );
+
     axum::serve(listener, app).await?;
 
     Ok(())
 }
 
-async fn health(State(state): State<AppState>) -> Json<DataResponse<&'static str>> {
-    let _db = state.db.clone();
+async fn health(State(state): State<AppState>) -> ApiResult<&'static str> {
+    sqlx::query("SELECT 1").execute(&state.db).await?;
 
-    Json(DataResponse::new("ok"))
+    Ok(Json(DataResponse::new("ok")))
 }
 
 fn static_files(root: PathBuf) -> ServeDir<ServeFile> {

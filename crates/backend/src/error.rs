@@ -92,11 +92,26 @@ impl IntoResponse for AppError {
         let status = self.status();
 
         if status.is_server_error() {
-            eprintln!("{self:?}");
+            log_server_error(status, &self);
         }
 
         let body = ErrorResponse::new(self.code(), self.client_message());
         (status, Json(body)).into_response()
+    }
+}
+
+fn log_server_error(status: StatusCode, error: &AppError) {
+    eprintln!(
+        "server_error status={} code={} error={error}",
+        status.as_u16(),
+        error.code()
+    );
+    eprintln!("server_error debug={error:?}");
+
+    let mut source = error.source();
+    while let Some(error) = source {
+        eprintln!("server_error source={error}");
+        source = error.source();
     }
 }
 
