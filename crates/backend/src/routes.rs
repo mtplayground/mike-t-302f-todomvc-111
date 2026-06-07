@@ -8,13 +8,15 @@ use axum::{
     Json, Router,
     extract::{Path, State, rejection::JsonRejection},
     http::StatusCode,
-    routing::{get, patch},
+    routing::{delete, get, patch, post},
 };
 use serde::{Deserialize, Serialize};
 
 pub fn todo_routes() -> Router<AppState> {
     Router::new()
         .route("/api/todos", get(list_todos).post(create_todo))
+        .route("/api/todos/toggle-all", post(toggle_all_todos))
+        .route("/api/todos/completed", delete(clear_completed_todos))
         .route("/api/todos/{id}", patch(update_todo).delete(delete_todo))
 }
 
@@ -61,9 +63,31 @@ async fn delete_todo(
     Ok(Json(DataResponse::new(DeleteTodoResponse { deleted })))
 }
 
+async fn toggle_all_todos(
+    State(state): State<AppState>,
+    payload: Result<Json<ToggleAllRequest>, JsonRejection>,
+) -> ApiResult<Vec<Todo>> {
+    let Json(payload) = payload.map_err(AppError::from)?;
+    let todos = todos::toggle_all(&state.db, payload.completed).await?;
+
+    Ok(Json(DataResponse::new(todos)))
+}
+
+async fn clear_completed_todos(State(state): State<AppState>) -> ApiResult<Vec<Todo>> {
+    let _deleted_count = todos::clear_completed(&state.db).await?;
+    let todos = todos::list(&state.db).await?;
+
+    Ok(Json(DataResponse::new(todos)))
+}
+
 #[derive(Clone, Debug, Deserialize)]
 struct CreateTodoRequest {
     title: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ToggleAllRequest {
+    completed: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
