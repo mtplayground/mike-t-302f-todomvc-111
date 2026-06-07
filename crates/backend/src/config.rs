@@ -1,11 +1,13 @@
-use std::{env, error::Error, fmt, net::SocketAddr};
+use std::{env, error::Error, fmt, net::SocketAddr, path::PathBuf};
 
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8080";
+const DEFAULT_FRONTEND_DIST_DIR: &str = "crates/frontend/dist";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     pub database_url: String,
     pub bind_address: SocketAddr,
+    pub frontend_dist_dir: PathBuf,
 }
 
 impl Config {
@@ -19,10 +21,14 @@ impl Config {
                 value: bind_address_value,
                 source,
             })?;
+        let frontend_dist_dir = optional_env("FRONTEND_DIST_DIR")
+            .unwrap_or_else(|| DEFAULT_FRONTEND_DIST_DIR.to_owned())
+            .into();
 
         Ok(Self {
             database_url,
             bind_address,
+            frontend_dist_dir,
         })
     }
 }

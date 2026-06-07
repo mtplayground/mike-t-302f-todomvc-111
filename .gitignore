@@ -1,5 +1,6 @@
 target/
 node_modules/
+crates/frontend/dist/
 .gh_token
 .claude/
 .database_url
