@@ -1,15 +1,5 @@
-mod config;
-mod db;
-mod error;
-mod models;
-mod routes;
-mod state;
-mod todos;
-
 use axum::{Json, Router, extract::State, routing::get};
-use config::Config;
-use error::DataResponse;
-use state::AppState;
+use backend::{config::Config, db, error::DataResponse, routes, state::AppState};
 use std::path::{Path, PathBuf};
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
