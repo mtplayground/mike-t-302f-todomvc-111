@@ -2,12 +2,14 @@ use std::{env, error::Error, fmt, net::SocketAddr, path::PathBuf};
 
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8080";
 const DEFAULT_FRONTEND_DIST_DIR: &str = "crates/frontend/dist";
+const DEFAULT_DB_MAX_CONNECTIONS: u32 = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     pub database_url: String,
     pub bind_address: SocketAddr,
     pub frontend_dist_dir: PathBuf,
+    pub db_max_connections: u32,
 }
 
 impl Config {
@@ -24,11 +26,16 @@ impl Config {
         let frontend_dist_dir = optional_env("FRONTEND_DIST_DIR")
             .unwrap_or_else(|| DEFAULT_FRONTEND_DIST_DIR.to_owned())
             .into();
+        let db_max_connections = optional_env("DB_MAX_CONNECTIONS")
+            .map(parse_db_max_connections)
+            .transpose()?
+            .unwrap_or(DEFAULT_DB_MAX_CONNECTIONS);
 
         Ok(Self {
             database_url,
             bind_address,
             frontend_dist_dir,
+            db_max_connections,
         })
     }
 }
@@ -40,6 +47,11 @@ pub enum ConfigError {
         value: String,
         source: std::net::AddrParseError,
     },
+    InvalidDbMaxConnections {
+        value: String,
+        source: std::num::ParseIntError,
+    },
+    InvalidDbMaxConnectionsValue { value: String },
 }
 
 impl fmt::Display for ConfigError {
@@ -48,6 +60,12 @@ impl fmt::Display for ConfigError {
             Self::MissingEnv { name } => write!(formatter, "required environment variable {name} is not set"),
             Self::InvalidBindAddress { value, source } => {
                 write!(formatter, "BIND_ADDRESS value {value:?} is invalid: {source}")
+            }
+            Self::InvalidDbMaxConnections { value, source } => {
+                write!(formatter, "DB_MAX_CONNECTIONS value {value:?} is invalid: {source}")
+            }
+            Self::InvalidDbMaxConnectionsValue { value } => {
+                write!(formatter, "DB_MAX_CONNECTIONS value {value:?} must be greater than zero")
             }
         }
     }
@@ -58,6 +76,8 @@ impl Error for ConfigError {
         match self {
             Self::MissingEnv { .. } => None,
             Self::InvalidBindAddress { source, .. } => Some(source),
+            Self::InvalidDbMaxConnections { source, .. } => Some(source),
+            Self::InvalidDbMaxConnectionsValue { .. } => None,
         }
     }
 }
@@ -75,4 +95,19 @@ fn optional_env(name: &'static str) -> Option<String> {
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
+}
+
+fn parse_db_max_connections(value: String) -> Result<u32, ConfigError> {
+    let parsed = value
+        .parse()
+        .map_err(|source| ConfigError::InvalidDbMaxConnections {
+            value: value.clone(),
+            source,
+        })?;
+
+    if parsed == 0 {
+        Err(ConfigError::InvalidDbMaxConnectionsValue { value })
+    } else {
+        Ok(parsed)
+    }
 }

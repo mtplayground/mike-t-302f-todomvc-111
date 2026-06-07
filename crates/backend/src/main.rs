@@ -1,7 +1,10 @@
 mod config;
+mod db;
+mod state;
 
-use axum::{Router, routing::get};
+use axum::{Router, extract::State, routing::get};
 use config::Config;
+use state::AppState;
 use std::path::{Path, PathBuf};
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
@@ -9,12 +12,14 @@ use tower_http::services::{ServeDir, ServeFile};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::from_env()?;
-    let _database_url = config.database_url.as_str();
     let static_files = static_files(config.frontend_dist_dir.clone());
+    let db = db::init_pool(&config).await?;
+    let state = AppState::new(db);
 
     let app = Router::new()
         .route("/health", get(health))
-        .fallback_service(static_files);
+        .fallback_service(static_files)
+        .with_state(state);
     let listener = TcpListener::bind(config.bind_address).await?;
 
     axum::serve(listener, app).await?;
@@ -22,7 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn health() -> &'static str {
+async fn health(State(state): State<AppState>) -> &'static str {
+    let _db = state.db.clone();
+
     "ok"
 }
 

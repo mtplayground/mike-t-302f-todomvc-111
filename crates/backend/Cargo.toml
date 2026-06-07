@@ -7,5 +7,6 @@ repository.workspace = true
 
 [dependencies]
 axum = "=0.8.9"
+sqlx = { version = "=0.9.0", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "migrate"] }
 tokio = { version = "=1.52.3", features = ["macros", "net", "rt-multi-thread"] }
 tower-http = { version = "=0.6.11", features = ["fs"] }
