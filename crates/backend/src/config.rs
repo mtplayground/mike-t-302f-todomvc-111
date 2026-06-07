@@ -1,7 +1,6 @@
 use std::{env, error::Error, fmt, net::SocketAddr, path::PathBuf};
 
 const DEFAULT_BIND_ADDRESS: &str = "0.0.0.0:8080";
-const DEFAULT_FRONTEND_DIST_DIR: &str = "crates/frontend/dist";
 const DEFAULT_DB_MAX_CONNECTIONS: u32 = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -24,8 +23,8 @@ impl Config {
                 source,
             })?;
         let frontend_dist_dir = optional_env("FRONTEND_DIST_DIR")
-            .unwrap_or_else(|| DEFAULT_FRONTEND_DIST_DIR.to_owned())
-            .into();
+            .map(PathBuf::from)
+            .unwrap_or_else(default_frontend_dist_dir);
         let db_max_connections = optional_env("DB_MAX_CONNECTIONS")
             .map(parse_db_max_connections)
             .transpose()?
@@ -38,6 +37,10 @@ impl Config {
             db_max_connections,
         })
     }
+}
+
+fn default_frontend_dist_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/dist")
 }
 
 #[derive(Debug)]

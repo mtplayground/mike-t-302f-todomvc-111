@@ -13,7 +13,9 @@ use tower_http::services::{ServeDir, ServeFile};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::from_env()?;
-    let static_files = static_files(config.frontend_dist_dir.clone());
+    let static_files = ServeDir::new(&config.frontend_dist_dir).not_found_service(ServeFile::new(
+        index_file(&config.frontend_dist_dir),
+    ));
     let db = db::init_pool(&config).await?;
     let state = AppState::new(db);
 
@@ -39,10 +41,6 @@ async fn health(State(state): State<AppState>) -> ApiResult<&'static str> {
     sqlx::query("SELECT 1").execute(&state.db).await?;
 
     Ok(Json(DataResponse::new("ok")))
-}
-
-fn static_files(root: PathBuf) -> ServeDir<ServeFile> {
-    ServeDir::new(&root).not_found_service(ServeFile::new(index_file(&root)))
 }
 
 fn index_file(root: &Path) -> PathBuf {

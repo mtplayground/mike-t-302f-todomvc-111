@@ -120,7 +120,7 @@ fn TodoFooter(state: TodoState) -> impl IntoView {
                 <li><TodoFilterLink state=state filter=TodoFilter::Active/></li>
                 <li><TodoFilterLink state=state filter=TodoFilter::Completed/></li>
             </ul>
-            <Show when=move || state.completed_count() > 0>
+            <Show when=move || { state.completed_count() > 0 }>
                 <button
                     class="clear-completed"
                     type="button"
@@ -272,7 +272,9 @@ fn TodoItem(state: TodoState, todo: Todo) -> impl IntoView {
 fn filter_from_hash() -> TodoFilter {
     #[cfg(target_arch = "wasm32")]
     {
-        let hash = leptos::window().location().hash().unwrap_or_default();
+        let hash = web_sys::window()
+            .and_then(|window| window.location().hash().ok())
+            .unwrap_or_default();
         return TodoFilter::from_hash(&hash);
     }
 
