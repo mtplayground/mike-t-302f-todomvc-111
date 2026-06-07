@@ -1,3 +1,7 @@
+pub mod api;
+pub mod state;
+pub mod types;
+
 use leptos::prelude::*;
 
 #[component]
@@ -14,4 +18,3 @@ pub fn App() -> impl IntoView {
 pub fn mount() {
     leptos::mount::mount_to_body(App);
 }
-
