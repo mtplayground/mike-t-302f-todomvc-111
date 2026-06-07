@@ -1,0 +1,85 @@
+# Architecture Plan
+
+## Product Scope
+
+Build `mike-t-302f-todomvc-111` as a Rust TodoMVC implementation with an Axum JSON API, SQLx-backed persistence, and a Leptos CSR frontend built by Trunk. The UI follows the official TodoMVC behavior: add, list, toggle, delete, inline edit, hash-based filters, counts, clear completed, and toggle-all.
+
+## Workspace And File Organization
+
+- `Cargo.toml`: workspace root containing `crates/backend` and `crates/frontend`.
+- `crates/backend/`: Axum server binary.
+  - `src/main.rs`: load configuration, initialize tracing, DB pool, migrations, router, and static asset serving.
+  - `src/config.rs`: environment parsing for `DATABASE_URL` and bind address.
+  - `src/db.rs`: SQLx pool construction and migration runner.
+  - `src/error.rs`: application error enum, HTTP status mapping, and JSON error response implementation.
+  - `src/models.rs`: `Todo` row/response model and request DTOs where backend-only validation is needed.
+  - `src/todos.rs`: data-access functions for list/create/update/delete/toggle-all/clear-completed.
+  - `src/routes.rs`: API router composition and handlers.
+  - `tests/`: integration tests for API behavior against a test database.
+- `crates/backend/migrations/`: SQLx migrations, starting with the `todos` table.
+- `crates/frontend/`: Leptos CSR app compiled by Trunk.
+  - `index.html`: Trunk entry point and stylesheet links.
+  - `src/main.rs`: app mount point.
+  - `src/api.rs`: async API client for all todo endpoints.
+  - `src/state.rs`: reactive todo list/filter state and actions.
+  - `src/types.rs`: frontend request/response types matching backend JSON.
+  - `src/components/`: `TodoApp`, header input, list, todo item, inline editor, and footer controls.
+  - `assets/`: official TodoMVC CSS and any static frontend assets.
+- `e2e/` or `tests/e2e/`: Playwright/spec-style end-to-end tests once the full app flow exists.
+- `.env.example`: documented local values for `DATABASE_URL` and bind address.
+
+## Shared Types
+
+Use stable JSON shapes shared conceptually between backend and frontend:
+
+- `Todo`: `id`, `title`, `completed`, `created_at`.
+- `CreateTodoRequest`: `title`.
+- `UpdateTodoRequest`: optional `title`, optional `completed`.
+- `ErrorResponse`: machine-readable `error` plus human-readable `message`.
+
+For the initial workspace, duplicate small DTOs in backend/frontend crates to avoid prematurely adding a third shared crate. If type drift becomes a real problem after the API client is implemented, add `crates/shared` with serde-compatible DTOs used by both crates.
+
+## Backend Design
+
+- Axum owns HTTP routing under `/api/todos`.
+- SQLx owns persistence with compile-time checked queries where practical.
+- Startup loads config from environment, initializes a connection pool, runs migrations, builds application state, and serves both API routes and Trunk-generated frontend assets.
+- Validation rejects empty or whitespace-only todo titles at API boundaries and data-access boundaries where useful.
+- Error handling is centralized through an app error type implementing Axum response conversion, producing consistent JSON failures.
+- Bulk endpoints:
+  - `POST /api/todos/toggle-all`: set all todos to the requested completed state, or infer target state from current rows if the issue body later specifies that behavior.
+  - `DELETE /api/todos/completed`: remove completed rows and return the remaining list or a success envelope, keeping the client contract consistent with other endpoints.
+
+## Frontend Design
+
+- Leptos CSR app is built by Trunk; the backend serves the generated static files.
+- State is held in signals for todo list, active filter, pending/error states, and active edit id.
+- API actions update local state from server responses to keep persistence authoritative.
+- Hash routing supports `#/`, `#/active`, and `#/completed` without a full router dependency unless needed.
+- Components stay close to TodoMVC conventions:
+  - Header input creates todos on Enter and ignores blank values.
+  - Main and footer are hidden when there are no todos.
+  - Todo items support toggle, hover delete, double-click edit, Enter save, Escape cancel, and empty-title delete.
+  - Footer shows remaining count, filters, conditional clear-completed, and toggle-all.
+
+## Issue Dependencies
+
+1. Issue #1 creates the Cargo workspace, backend crate, and Leptos CSR frontend crate.
+2. Issues #2 and #3 build on the workspace: config/env support and Trunk/static serving.
+3. Issues #4 and #5 establish persistence: migration, DB pool, model, and data-access layer.
+4. Issue #6 adds shared API error behavior before endpoint work expands.
+5. Issues #7 and #8 expose CRUD and bulk HTTP behavior.
+6. Issue #9 adds the frontend API client and reactive state on top of completed endpoints.
+7. Issues #10 through #13 implement TodoMVC UI flows incrementally.
+8. Issue #14 validates backend data-access and endpoint behavior.
+9. Issue #15 validates complete TodoMVC behavior in a browser.
+10. Issue #16 reviews error paths, logging, docs, and deployment readiness.
+
+## Key Decisions
+
+- Use Leptos CSR, not full-stack SSR, because the issue explicitly calls for Trunk and an Axum server serving static assets.
+- Keep API routes JSON-only and independent from frontend rendering, allowing backend tests without WASM/browser setup.
+- Let SQLx migrations define the database contract; run migrations at startup for local/self-hosted deployment simplicity.
+- Keep frontend state server-authoritative after mutations to avoid subtle drift during edit, clear, and toggle-all flows.
+- Avoid adding a shared crate until there is enough type surface to justify workspace complexity.
+- Preserve TodoMVC CSS and behavior closely so the official spec can drive the final end-to-end tests.
